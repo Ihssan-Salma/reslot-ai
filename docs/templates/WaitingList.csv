@@ -1,0 +1,4 @@
+entry_id,customer_id,requested_offering,preferred_start,preferred_end,party_size,quantity,additional_preferences,status
+wait-001,cust-001,Dinner,2027-01-02T18:00:00+01:00,2027-01-02T21:00:00+01:00,2,1,Near a window,WAITING
+wait-002,cust-002,Overnight stay,2027-01-03,2027-01-05,2,1,Quiet location,INACTIVE
+wait-003,cust-003,Haircut,2027-01-04T09:00:00+01:00,2027-01-04T12:00:00+01:00,,1,,WAITING

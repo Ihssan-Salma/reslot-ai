@@ -1,0 +1,72 @@
+name: reslot-ai
+x-backend: &backend
+  image: reslot-ai-backend:local
+  build: ./backend
+  environment: &runtime-environment
+    APP_ENV: ${APP_ENV:-development}
+    DATABASE_URL: postgresql+psycopg://reslot_app:${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+    REDIS_URL: redis://redis:6379/0
+    CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:5173"]}'
+    COOKIE_SECURE: ${COOKIE_SECURE:-false}
+    SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}
+    GOOGLE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_TOKEN_ENCRYPTION_KEY:-}
+    GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+    GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/v1/oauth/google/callback}
+    GROQ_API_KEY: ${GROQ_API_KEY:-}
+    GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+  migrate:
+    <<: *backend
+    command: ["python", "-m", "app.db.migrate"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?Set POSTGRES_USER}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:?Set POSTGRES_DB}
+      APP_DATABASE_PASSWORD: ${APP_DATABASE_PASSWORD:?Set APP_DATABASE_PASSWORD}
+    depends_on:
+      postgres: {condition: service_healthy}
+  backend:
+    <<: *backend
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  worker:
+    <<: *backend
+    profiles: ["automation"]
+    command: ["celery", "-A", "app.core.celery_app:celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend: {condition: service_healthy}
+    ports: ["127.0.0.1:5173:80"]
+volumes:
+  postgres_data:

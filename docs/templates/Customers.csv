@@ -1,0 +1,4 @@
+customer_id,full_name,email,phone,notification_consent
+cust-001,Alex Example,alex@example.com,,TRUE
+cust-002,Sam Example,sam@example.com,,FALSE
+cust-003,Robin Example,robin@example.com,,TRUE
