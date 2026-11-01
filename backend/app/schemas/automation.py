@@ -169,6 +169,7 @@ class EventNormalization(BaseModel):
     event_id: str
     classification: Literal["reservation", "review", "ignored"]
     source_status: str = "confirmed"
+    data_source: Literal["live", "snapshot"] = "live"
     reservation: NormalizedReservation | None = None
     review_reasons: list[str] = Field(default_factory=list)
 

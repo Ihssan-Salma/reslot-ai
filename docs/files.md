@@ -4,6 +4,25 @@ Current source/configuration and preserved legacy archive. Generated dependencie
 build output, local IDE files and secret environment files are excluded. Files under
 `legacy/reservation_management/` are archived and not active application code.
 
+Task 05 additions: authenticated MCP modules, offline/real demonstration, protocol tests and guide.
+
+- `backend/app/mcp/__init__.py`
+- `backend/app/mcp/server.py`
+- `backend/app/mcp/client.py`
+- `backend/app/mcp/context.py`
+- `backend/app/mcp/schemas.py`
+- `backend/app/mcp/calendar.py`
+- `backend/app/mcp/sheets.py`
+- `backend/app/mcp/gmail.py`
+- `backend/scripts/mcp_demo.py`
+- `backend/tests/test_mcp.py`
+- `docs/mcp.md`
+
+Task 05 modifies `backend/pyproject.toml`, `backend/app/services/google.py`,
+`backend/app/services/calendar_reservations.py`, `backend/app/schemas/automation.py`, this inventory,
+`README.md`, `docs/architecture-pivot.md`, `docs/calendar-reservation-format.md` and
+`docs/verification.md`. Existing migrations, authentication, frontend and infrastructure remain.
+
 - `.env.example`
 - `.github/workflows/ci.yml`
 - `.gitignore`

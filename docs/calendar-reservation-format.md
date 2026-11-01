@@ -54,10 +54,13 @@ a DST day need not be 24 hours. Mixed types and nonpositive intervals require re
 calendar and returns classification, source status, review reasons, and (when supported):
 calendar_id, event_id, reservation_reference, offering, start_at, end_at, resource_label,
 party_size, quantity, additional_requirements, optional customer_reference, and all_day.
-Cancellation status is kept separately. Known validation gap: an unmarked deletion tombstone
-is currently ignored and erases earlier normalized snapshot metadata; 404/410 have no recovery
-response. Deletion recovery is not verified. See [the failing regression](verification.md).
-The latest minimal normalized snapshot is stored, never the full provider event.
+Cancellation status is kept separately. Task 05 preserves the last valid normalized snapshot
+when later source metadata is incomplete. A cancelled tombstone or event HTTP 404/410 can recover
+that snapshot only for the same tenant, selected calendar, event and Google subject. Recovery is
+flagged for review with `data_source: snapshot`; missing HTTP resources use source status
+`unavailable`, since a 404 alone does not prove deletion. Access denial and outages never trigger
+fallback. No valid previous snapshot means no recovery. See [MCP details](mcp.md) and
+[actual verification](verification.md). Full provider events are never stored.
 
 `POST /api/v1/integrations/calendar/availability` accepts offset-aware `start_at`, `end_at`
 (up to 31 days), and optional `exclude_event_id`. Busy opaque overlapping events block availability,

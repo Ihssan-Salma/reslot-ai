@@ -254,7 +254,14 @@ class GoogleService:
         self.access_token = token
         return token
 
-    def get(self, url: str, params: Any = None, *, missing_ok: bool = False) -> dict[str, Any]:
+    def get(
+        self,
+        url: str,
+        params: Any = None,
+        *,
+        missing_ok: bool = False,
+        identify_missing: bool = False,
+    ) -> dict[str, Any]:
         connection = self.connected()
         token = self.access_token or self.refresh(connection)
         response = self.http.request(
@@ -274,6 +281,8 @@ class GoogleService:
             )
         if response.status_code == 404 and missing_ok:
             return {"deleted": True, "accessRole": "none"}
+        if identify_missing and response.status_code in (404, 410):
+            raise GoogleError("google_resource_not_found", "Google resource not found", 404)
         if response.status_code == 403:
             raise GoogleError(
                 "google_permission_denied",

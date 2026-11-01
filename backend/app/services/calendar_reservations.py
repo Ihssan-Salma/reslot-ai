@@ -168,20 +168,48 @@ class CalendarReservationService:
         calendar = self.selected_calendar()
         if not event_id or len(event_id) > 1024:
             raise GoogleError("invalid_event_id", "Invalid event ID", 422)
-        event = self.google.get(
-            CALENDAR_URL
-            + "/calendars/"
-            + quote(calendar.google_calendar_id, safe="")
-            + "/events/"
-            + quote(event_id, safe="")
-        )
+        subject = self.google.connected().google_subject
+        snapshot = self.repository.snapshot(calendar.google_calendar_id, event_id)
+        try:
+            event = self.google.get(
+                CALENDAR_URL
+                + "/calendars/"
+                + quote(calendar.google_calendar_id, safe="")
+                + "/events/"
+                + quote(event_id, safe=""),
+                identify_missing=True,
+            )
+        except GoogleError as exc:
+            if exc.status != 404:
+                raise
+            event = {"id": event_id, "status": "unavailable"}
+            if snapshot is None:
+                raise
         if event.get("id") != event_id:
             raise GoogleError("invalid_google_response", "Google returned an unexpected event")
         result = normalize_reservation_event(
             event, calendar.google_calendar_id, calendar.timezone, self.google.tenant.id
         )
-        subject = self.google.connected().google_subject
-        snapshot = self.repository.snapshot(calendar.google_calendar_id, event_id)
+        if event.get("status") in {"cancelled", "unavailable"} and result.reservation is None:
+            if snapshot and snapshot.google_subject == subject and snapshot.normalized_payload:
+                try:
+                    previous = NormalizedReservation.model_validate(snapshot.normalized_payload)
+                    if (
+                        previous.calendar_id != calendar.google_calendar_id
+                        or previous.event_id != event_id
+                        or previous.end_at <= previous.start_at
+                    ):
+                        raise ValueError("Snapshot identity mismatch")
+                    result.reservation = previous
+                    result.data_source = "snapshot"
+                except (ValidationError, ValueError):
+                    pass
+            result.classification = "review"
+            result.review_reasons = [
+                "deleted_event_snapshot_requires_review"
+                if result.reservation
+                else "deleted_event_without_valid_snapshot"
+            ]
         if snapshot is None:
             snapshot = CalendarEventSnapshot(
                 tenant_id=self.google.tenant.id,
@@ -189,15 +217,16 @@ class CalendarReservationService:
                 event_id=event_id,
             )
             self.db.add(snapshot)
+        if snapshot.google_subject != subject:
+            snapshot.normalized_payload = None
         snapshot.google_subject = subject
         snapshot.etag = event.get("etag")
         snapshot.classification, snapshot.source_status = (
             result.classification,
             result.source_status,
         )
-        snapshot.normalized_payload = (
-            result.reservation.model_dump(mode="json") if result.reservation else None
-        )
+        if result.reservation:
+            snapshot.normalized_payload = result.reservation.model_dump(mode="json")
         snapshot.review_reasons = result.review_reasons
         self.db.flush()
         return result

@@ -2,7 +2,8 @@
 
 ReSlot AI coordinates cancellation recovery using existing business systems. Calendar owns
 reservations; Gmail owns messages; an authorized Google Sheet owns customers and waiting lists.
-It is not a booking management system. LangGraph agents and MCP tools are future work.
+It is not a booking management system. Task 05 adds authenticated [MCP tools](mcp.md);
+LangGraph agents remain future work.
 
 The HTTP boundary authenticates the session, verifies tenant membership, derives transaction-local
 tenant context, and checks owner/admin permission before calling integration services. Repositories
@@ -12,9 +13,9 @@ a transaction advisory lock, handles refresh/revocation, and never returns crede
 
 `GoogleSheetsService` validates the configured external dataset and offers narrow read/lookup/status
 operations. `CalendarReservationService` reads the selected calendar, normalizes marked events,
-and checks busy intervals. They have no dependency on HTTP handlers and can be adapted to future
-authenticated MCP tools. Future tools must receive an already authorized server-side tenant
-context; an LLM-supplied tenant or spreadsheet ID must never set database context.
+and checks busy intervals. They have no dependency on HTTP handlers and are reused by the
+authenticated MCP tools. Tool calls receive an already authorized server-side tenant context;
+an LLM-supplied tenant or spreadsheet ID can never set database context.
 
 ## Persistence boundary
 
@@ -66,9 +67,9 @@ manually rather than blindly retrying. PostgreSQL receipts cannot make Google Sh
 Do not deploy unattended competing writers until a stronger provider-side coordination scheme
 is implemented. Availability reads likewise are observations, not capacity holds or bookings.
 
-## Final validation finding
+## Snapshot retention follow-up
 
-The deletion-retention regression fails: a later minimal Calendar deletion tombstone overwrites
-last-known normalized snapshot metadata with null. HTTP 404/410 also have no recovery response.
-Snapshot recovery is not ready for cancellation workflows. See [actual final results](verification.md).
-No production fix or Task 05 feature was added during final validation.
+Task 04 final validation found a deletion-retention regression. Task 05 fixes preservation of
+last valid metadata and adds review-required recovery for tombstones and event HTTP 404/410,
+bound to tenant, selected calendar, event and Google subject. No schema migration was necessary.
+See [actual verification results](verification.md) and [MCP architecture](mcp.md).

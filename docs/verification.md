@@ -1,4 +1,104 @@
-# Task 04 final validation
+# Task 05 verification
+
+Validated November 1, 2026. Official MCP SDK `2.2.0`, Python 3.12, real PostgreSQL
+authorization/RLS and mocked Google HTTP. **No real Google integration tests were executed.**
+
+## Final automated results
+
+From the repository root:
+
+```powershell
+Push-Location backend
+..\.venv\Scripts\python scripts/test_backend.py --database
+Pop-Location
+```
+
+Actual final output:
+
+```text
+164 passed in 177.42s (0:02:57)
+```
+
+**164 passed, 0 failed, 0 skipped, 0 errors.** This includes all 126 existing tests and
+38 new MCP tests. The focused MCP + automation integration run passed **69 tests in 117.27s**.
+The original Task 04 snapshot deletion regression now passes. An intermediate complete run
+found a changed generic Google 404 response; the new not-found behavior was limited to event
+and message reads, preserving the existing Sheets API contract before this final passing run.
+
+Additional actual checks:
+
+- Ruff check: passed. Ruff format check: **82 files already formatted**.
+- Mypy: **no issues in 59 source files**.
+- `python -m pip check`: no broken requirements.
+- Offline MCP demo: official client connected, discovered all six tools and received validated
+  event, candidate and profile responses. Demo `--help` also passed.
+- Local updated FastAPI startup completed. `/health` returned `ok`, `/health/ready` returned
+  `ready`, and OpenAPI returned HTTP 200. The temporary verification process was stopped.
+- Updated Docker backend image built successfully. Compose migration exited 0; backend,
+  PostgreSQL and Redis are healthy and the frontend is running. Live container-backed health,
+  readiness and frontend root checks returned HTTP 200. This is not a browser E2E test.
+- The synthetic MCP demo also passed inside the Linux Docker image; container `pip check`
+  found no broken requirements. The application was left running at http://localhost:5173.
+- Migration inspection through the dedicated `migrate` service returned `0009 (head)` and
+  `No new upgrade operations detected`. An initial attempt under the runtime role was denied
+  access to `alembic_version`, as required by the separation of database privileges.
+- Test databases replayed migrations `0001`–`0009` and passed Alembic drift checks. Task 05 adds
+  no migration and does not delete or truncate application data.
+
+Additional container verification commands executed from the repository root:
+
+```powershell
+docker compose build backend
+docker compose up -d
+docker compose run --rm --no-deps -v "${PWD}/backend/scripts:/app/scripts:ro" backend python scripts/mcp_demo.py
+docker compose exec backend python -m pip check
+docker compose run --rm --no-deps migrate alembic current
+docker compose run --rm --no-deps migrate alembic check
+```
+
+## Architecture and coverage
+
+See [MCP architecture, contracts and exact startup commands](mcp.md) and
+[created/modified files](files.md). Active application modules retain authentication, tenant
+membership, OAuth, Sheets, Calendar normalization, Gmail and minimal integration persistence.
+New `app/mcp` modules implement the server, trusted session context, six tools, schemas and
+reusable official SDK client. No frontend changes, agent workflows, outbound communication or
+booking management features were added. Previously archived booking code remains archived;
+Celery/Redis infrastructure and all historical migrations remain retained.
+
+Protocol tests cover discovery, typed responses, availability, deterministic eligibility,
+customer/entry lookup, Gmail HTTP and bounded MIME parsing, invalid arguments, missing resources,
+provider failures, sanitized errors, session logout/expiry/switching, membership removal/role
+downgrade, Google revocation persistence, concurrent tenants with distinct configured sheets,
+foreign resource arguments, and snapshot subject/event/payload/permission checks.
+Existing OAuth consent, RLS, schema, generic industry and CSRF tests continue to pass.
+
+Snapshot recovery preserves last valid metadata and requires review; it does not prove current
+availability. Resource-specific capacity is deliberately uncertain. Free-text preferences need
+review. Only a trusted local in-process/stdio MCP transport is provided; there is no HTTP MCP
+endpoint. Existing Sheets external-row-reordering limitations remain; MCP exposes no write tools.
+
+## Real-account smoke test (manual, not executed)
+
+Configure a dedicated Google test account using [Google setup](google-setup.md), authorize Sheets,
+configure the spreadsheet and selected calendar, and add synthetic records plus a marked event.
+From repository root, replace placeholders and use your source record's actual dates:
+
+```powershell
+docker compose up --build -d
+Push-Location backend
+..\.venv\Scripts\python scripts/mcp_demo.py --real --email owner@example.com --tenant-id YOUR_BUSINESS_UUID --event-id YOUR_EVENT_ID --customer-id YOUR_CUSTOMER_ID --offering "Dinner" --start-at "2027-01-02T17:00:00Z" --end-at "2027-01-02T18:00:00Z" --party-size 2 --quantity 1
+Pop-Location
+```
+
+Add `--message-id YOUR_MESSAGE_ID` for Gmail. Passwords are prompted securely; output omits real
+contact data and bodies. Repeat with two separate businesses/private resources to check real
+provider isolation. The complete [manual guide](mcp.md) includes local server startup and client
+connection. Google consent, provider ACLs and real responses still need this manual validation.
+
+---
+
+# Historical Task 04 final validation (superseded by Task 05 above)
 
 Validated on October 31, 2026. Status: **not fully signed off; snapshot deletion retention fails**.
 This validation added a regression test and strengthened the existing OAuth reauthorization test.
